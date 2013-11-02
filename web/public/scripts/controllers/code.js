@@ -1,6 +1,8 @@
-app.controller('code', function code($scope, $timeout, insight, snippets, fullscreen) {
+app.controller('code', function code($scope, $timeout, insight, fullscreen, keyboardManager) {
 	'use strict';
-	
+	$scope.code = "";
+	var autoComplete = [];
+	var compilationInfo = [];
 	var cmLeft, cmRight = null;
 
 	$scope.fullscreen = function(){
@@ -8,14 +10,19 @@ app.controller('code', function code($scope, $timeout, insight, snippets, fullsc
 	}
 
 	$scope.optionsCode = {
+		extraKeys: {"Ctrl-Space": "autocomplete"},
 		fixedGutter: false,
 		lineNumbers: true,
 		mode: 'text/x-scala',
 		theme: 'solarized light',
 		smartIndent: false,
 		autofocus: true,
-		onChange: function(cm,event) {
-			$scope.insight = insight($scope.code);
+		onChange: function(cm,event) {			
+			updateInsight(cm, function(data){
+					$scope.insight = data.insight;
+					autoComplete = data.completions;
+					compilationInfo = data.CompilationInfo;
+			});
 		},
 		onScroll: function(cm) {
 			if ($scope.cmLeft === null) {
@@ -55,7 +62,7 @@ app.controller('code', function code($scope, $timeout, insight, snippets, fullsc
 	$scope.toogleInsight = function() {
 		$scope.withInsight = !$scope.withInsight;
 	}
-
+	
 	$scope.publish = function(){
 		snippets.save({code: $scope.code});
 	}
@@ -80,4 +87,30 @@ app.controller('code', function code($scope, $timeout, insight, snippets, fullsc
 	// 		$scope.insightCode = "";
 	// 	}
 	// })();
+
+
+	CodeMirror.commands.autocomplete = function(cm) {
+		updateInsight(cm, function(data){
+			$scope.insight = data.insight;
+			autoComplete = data.completions;
+			compilationInfo = data.CompilationInfo;
+			CodeMirror.showHint(cm, function(cm, options){
+	        	var inner = {from: cm.getCursor(), to: cm.getCursor(), list: autoComplete};
+				return inner;
+	        });		
+		});
+        
+      };
+
+      function updateInsight(cm, functionToCall){
+			var cur = cm.getCursor();
+			var lines = $scope.code.split("\n");
+			var pos = cur.ch;
+			for (var i = 0; i < cur.line; i++){
+				pos += lines[i].length + 1;
+			}
+			insight($scope.code, pos).then (functionToCall);	
+	}
+ 	
 });
+
